@@ -107,9 +107,7 @@ export default function LoginScreen() {
                   <Text style={styles.checkboxLabel}>Remember me</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity>
-                  <Text style={styles.forgotPassword}>Forgot Password?</Text>
-                </TouchableOpacity>
+
               </View>
 
               {error ? <Text style={styles.errorText}>{error}</Text> : null}

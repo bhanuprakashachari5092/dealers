@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, ViewProps, Pressable } from 'react-native';
+import { StyleSheet, ViewProps, Pressable, Platform, View } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { BlurView } from 'expo-blur';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -27,10 +27,14 @@ export function Card({ children, style, variant = 'default', onPress, ...props }
     if (onPress) scale.value = withSpring(1, { damping: 15, stiffness: 300 });
   };
 
-  const CardContent = (
+  const CardContent = Platform.OS === 'ios' ? (
     <BlurView intensity={60} tint="light" style={[styles.card, variant === 'elevated' && styles.elevated, style as any]}>
       {children}
     </BlurView>
+  ) : (
+    <View style={[styles.card, variant === 'elevated' && styles.elevated, { backgroundColor: 'rgba(255, 255, 255, 0.95)' }, style as any]}>
+      {children}
+    </View>
   );
 
   if (onPress) {

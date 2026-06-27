@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "dealer-app",
+    "name": "Vendor99",
     "slug": "dealer-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.vendor99.dealerapp",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -39,6 +40,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "82159d65-9704-4e7c-bf9d-2632e0f609e1"
+      }
     }
   }
 }
