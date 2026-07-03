@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { AnimatedBackground } from '../../components/ui/AnimatedBackground';
 import { MapPin, Wrench, Clock, Navigation, Compass, CheckCircle2 } from 'lucide-react-native';
 import Animated, { FadeInUp, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
+import { Audio } from 'expo-av';
 
 // Pulsing location dot component
 const LocationPing = () => {
@@ -102,9 +103,46 @@ export default function NewLeadsScreen() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [acceptedLeadIds, setAcceptedLeadIds] = useState<string[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const prevCount = useRef(0);
+
+  const playRingingSound = async () => {
+    try {
+      if (sound) await sound.unloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=classic-phone-ringing-120536.mp3' },
+        { shouldPlay: true, isLooping: true }
+      );
+      setSound(newSound);
+    } catch (e) {
+      console.log('Error playing sound:', e);
+    }
+  };
+
+  const stopRingingSound = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' && Constants.appOwnership !== 'expo') {
@@ -173,6 +211,11 @@ export default function NewLeadsScreen() {
             // Notifications module not available
           }
         }
+        // Play continuous ringing sound
+        playRingingSound();
+      } else if (sortedLeads.length === 0) {
+        // Stop ringing if no leads left
+        stopRingingSound();
       }
       prevCount.current = sortedLeads.length;
       
@@ -187,6 +230,7 @@ export default function NewLeadsScreen() {
       Alert.alert('Authentication Error', 'You must be logged in to accept leads.');
       return;
     }
+    stopRingingSound();
     setAcceptingId(id);
     try {
       const success = await api.acceptLead(id, user.id);
