@@ -104,15 +104,7 @@ export default function DashboardScreen() {
             </Card>
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.delay(500).duration(600)} style={styles.statCardContainer}>
-            <Card variant="elevated" style={styles.statCard}>
-              <View style={[styles.iconContainer, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
-                <Calendar size={24} color={Colors.error} />
-              </View>
-              <Text style={styles.statValueExpiry}>{stats?.subscriptionExpiry || '-'}</Text>
-              <Text style={styles.statLabel}>Expiry Date</Text>
-            </Card>
-          </Animated.View>
+
         </View>
 
         <Animated.View entering={FadeInUp.delay(600).duration(800)}>
@@ -135,7 +127,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    paddingTop: 60, // Space for status bar / premium aesthetic
+    paddingTop: 16,
   },
   header: {
     marginBottom: 32,
@@ -167,8 +159,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.8)',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+    backgroundColor: 'rgba(25, 28, 36, 0.85)',
   },
   iconContainer: {
     width: 44,

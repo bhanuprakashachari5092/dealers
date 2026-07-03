@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { memo } from 'react';
 import { View, TextInput, Text, StyleSheet, TextInputProps, TouchableOpacity, Platform } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Eye, EyeOff } from 'lucide-react-native';
@@ -9,36 +9,30 @@ interface InputFieldProps extends TextInputProps {
   isPassword?: boolean;
 }
 
-export function InputField({ label, error, isPassword, style, value, onChangeText, placeholder, ...props }: InputFieldProps) {
-  const [isFocused, setIsFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+// Using memo to prevent unnecessary re-renders that cause focus loss
+export const InputField = memo(({ label, error, isPassword, style, value, onChangeText, placeholder, ...props }: InputFieldProps) => {
+  const [showPassword, setShowPassword] = React.useState(false);
 
   return (
     <View style={styles.container}>
       {label && (
-        <Text style={[
-          styles.label,
-          isFocused && styles.labelFocused,
-          error ? styles.labelError : null
-        ]}>
+        <Text style={styles.label}>
           {label}
         </Text>
       )}
       
       <View style={[
         styles.inputContainer,
-        isFocused && styles.inputFocused,
         error ? styles.inputError : null,
       ]}>
         <TextInput
           style={[styles.input, style]}
           placeholder={placeholder}
           placeholderTextColor={Colors.textSecondary}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           secureTextEntry={isPassword && !showPassword}
           value={value}
           onChangeText={onChangeText}
+          underlineColorAndroid="transparent"
           {...props}
         />
         {isPassword && (
@@ -58,11 +52,11 @@ export function InputField({ label, error, isPassword, style, value, onChangeTex
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -71,30 +65,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
-  labelFocused: {
-    color: Colors.primary,
-  },
-  labelError: {
-    color: Colors.error,
-  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(25, 28, 36, 0.8)',
     borderWidth: 1.5,
-    borderColor: 'rgba(226, 232, 240, 1)', // Slate-200
+    borderColor: 'rgba(212, 175, 55, 0.3)',
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 56,
-  },
-  inputFocused: {
-    borderColor: Colors.primary,
-    backgroundColor: '#FFFFFF',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
   },
   inputError: {
     borderColor: Colors.error,

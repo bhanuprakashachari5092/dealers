@@ -10,7 +10,7 @@ import {
   Pressable, 
   TouchableOpacity 
 } from 'react-native';
-import { api, Lead } from '../../services/api';
+import { api, Lead, WorkStep } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/Colors';
 import { Card } from '../../components/ui/Card';
@@ -50,8 +50,9 @@ export default function MyLeadsScreen() {
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
-    const unsubscribe = api.subscribeLeads('accepted', user.id, (data) => {
-      setLeads(data);
+    const unsubscribe = api.subscribeToLeads('accepted', user.id, (data) => {
+      const sortedLeads = data.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      setLeads(sortedLeads);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -276,11 +277,11 @@ export default function MyLeadsScreen() {
       }
 
       // 5. Update steps in Firestore
-      const currentSteps = lead.workSteps && lead.workSteps.length > 0
+      const currentSteps: WorkStep[] = lead.workSteps && lead.workSteps.length > 0
         ? JSON.parse(JSON.stringify(lead.workSteps))
         : DEFAULT_STEPS.map(s => ({ ...s }));
 
-      const targetStepIndex = currentSteps.findIndex((s: any) => s.id === stepId);
+      const targetStepIndex = currentSteps.findIndex((s: WorkStep) => s.id === stepId);
       if (targetStepIndex !== -1) {
         const wasCompleted = currentSteps[targetStepIndex].completed;
         currentSteps[targetStepIndex].completed = !wasCompleted;
@@ -288,7 +289,7 @@ export default function MyLeadsScreen() {
       }
 
       // Check if all steps are completed
-      const allCompleted = currentSteps.every((s: any) => s.completed);
+      const allCompleted = currentSteps.every((s: WorkStep) => s.completed);
       const newStatus = allCompleted ? 'Completed' : 'Pending';
 
       const success = await api.updateLeadProgress(lead.id, currentSteps, newStatus);
@@ -430,7 +431,7 @@ export default function MyLeadsScreen() {
                   </View>
                 </View>
 
-                {steps.map((step: any, stepIdx: number) => {
+                {steps.map((step: WorkStep, stepIdx: number) => {
                   const isStepUpdating = updatingStep?.leadId === item.id && updatingStep?.stepId === step.id;
                   
                   return (
@@ -520,7 +521,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 16,
     paddingBottom: 20,
   },
   headerTitle: {

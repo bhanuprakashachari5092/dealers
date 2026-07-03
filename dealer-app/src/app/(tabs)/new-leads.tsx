@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, Image } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import Constants from 'expo-constants';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, Image, Switch, Platform } from 'react-native';
 import { api, Lead } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/Colors';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { AnimatedBackground } from '../../components/ui/AnimatedBackground';
-import LottieView from 'lottie-react-native';
 import { MapPin, Wrench, Clock, Navigation, Compass, CheckCircle2 } from 'lucide-react-native';
 import Animated, { FadeInUp, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 
@@ -103,15 +103,84 @@ export default function NewLeadsScreen() {
   const [acceptedLeadIds, setAcceptedLeadIds] = useState<string[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
 
+  const [alertsEnabled, setAlertsEnabled] = useState(true);
+  const prevCount = useRef(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' && Constants.appOwnership !== 'expo') {
+      try {
+        const Notifications = require('expo-notifications');
+        Notifications.requestPermissionsAsync().catch(() => {});
+      } catch (e) {
+        // Notifications module not available in this environment
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || Constants.appOwnership === 'expo') return;
+    const toggleForegroundService = async () => {
+      try {
+        const notifee = require('@notifee/react-native').default;
+        const { AndroidImportance } = require('@notifee/react-native');
+        
+        if (alertsEnabled) {
+          const channelId = await notifee.createChannel({
+            id: 'leads-foreground',
+            name: 'Leads Listener',
+            importance: AndroidImportance.DEFAULT,
+          });
+
+          await notifee.displayNotification({
+            title: 'Vendor99 is Active',
+            body: 'Listening for new leads nearby...',
+            android: {
+              channelId,
+              asForegroundService: true,
+              color: '#D4AF37', // Gold color
+            },
+          });
+        } else {
+          await notifee.stopForegroundService();
+        }
+      } catch (e) {
+        // Failed to toggle foreground service (likely not natively linked yet)
+      }
+    };
+    
+    toggleForegroundService();
+  }, [alertsEnabled]);
+
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
-    const unsubscribe = api.subscribeLeads('new', user.id, (data) => {
-      setLeads(data);
+    const unsubscribe = api.subscribeToLeads('new', user.id, (data) => {
+      const sortedLeads = data.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      
+      if (alertsEnabled && sortedLeads.length > prevCount.current && prevCount.current !== 0) {
+        if (Platform.OS !== 'web' && Constants.appOwnership !== 'expo') {
+          try {
+            const Notifications = require('expo-notifications');
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: "New Lead Available! 🔔",
+                body: "A new customer is looking for service nearby.",
+                sound: true,
+              },
+              trigger: null,
+            }).catch(() => {});
+          } catch (e) {
+            // Notifications module not available
+          }
+        }
+      }
+      prevCount.current = sortedLeads.length;
+      
+      setLeads(sortedLeads);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user?.id]);
+  }, [user?.id, alertsEnabled]);
 
   const handleAccept = async (id: string) => {
     if (!user?.id) {
@@ -201,6 +270,16 @@ export default function NewLeadsScreen() {
 
   return (
     <AnimatedBackground>
+      <View style={styles.alertToggleContainer}>
+        <Text style={styles.alertToggleText}>Ring on new lead (Alerts)</Text>
+        <Switch 
+          value={alertsEnabled} 
+          onValueChange={setAlertsEnabled} 
+          trackColor={{ false: Colors.textSecondary, true: Colors.primary }}
+          thumbColor={Colors.white}
+        />
+      </View>
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -247,9 +326,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  alertToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(25, 28, 36, 0.5)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(212, 175, 55, 0.2)',
+  },
+  alertToggleText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
   list: {
     padding: 16,
-    paddingTop: 60,
+    paddingTop: 16,
     paddingBottom: 100,
   },
   card: {

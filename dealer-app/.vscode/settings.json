@@ -3,5 +3,14 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "C_Cpp.files.exclude": [
+    "**/.vscode",
+    "**/.vs",
+    "**/node_modules"
+  ],
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/android/**"
+  ]
 }

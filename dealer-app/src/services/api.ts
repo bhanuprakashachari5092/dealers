@@ -1,6 +1,13 @@
 import { db } from '../config/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, getDocs, runTransaction, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 
+export type WorkStep = {
+  id: string;
+  label: string;
+  completed: boolean;
+  updatedAt: string | null;
+};
+
 export type Lead = {
   id: string;
   customerName: string;
@@ -11,13 +18,14 @@ export type Lead = {
   phone?: string;
   amount?: string;
   numericAmount?: number;
-  workSteps?: any[];
+  workSteps?: WorkStep[];
   notes?: string;
   bookingId?: string;
   dealerDistances?: { [key: string]: string };
   customerLat?: number | null;
   customerLng?: number | null;
   selectedItems?: string[];
+  createdAt?: Date;
 };
 
 export type Notification = {
@@ -122,6 +130,58 @@ export const api = {
       console.error("Failed to get leads:", error);
       return [];
     }
+  },
+
+  // Real-time listener for leads
+  subscribeToLeads: (status: 'new' | 'accepted', dealerId: string, callback: (leads: Lead[]) => void) => {
+    if (!dealerId) {
+      callback([]);
+      return () => {};
+    }
+
+    let q;
+    if (status === 'new') {
+      q = query(collection(db, "bookings"), where("eligibleDealers", "array-contains", dealerId));
+    } else {
+      q = query(collection(db, "bookings"), where("dealerId", "==", dealerId));
+    }
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const leadsList: Lead[] = [];
+      snap.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
+        if (status === 'new' && data.dealerId !== null && data.dealerId !== undefined) {
+          return;
+        }
+        leadsList.push({
+          id: docSnapshot.id,
+          customerName: data.customerName || 'Anonymous',
+          area: data.customerAddress || 'N/A',
+          serviceRequired: data.serviceName || 'CCTV Service',
+          timestamp: data.bookingDate ? `${data.bookingDate} ${data.bookingTime || ''}` : 'N/A',
+          status: status,
+          phone: data.customerPhone || '',
+          amount: data.amount || '₹0',
+          numericAmount: data.numericAmount || 0,
+          workSteps: data.workSteps || [],
+          notes: data.notes || '',
+          bookingId: data.bookingId || docSnapshot.id,
+          dealerDistances: data.dealerDistances || {},
+          customerLat: data.customerLat || null,
+          customerLng: data.customerLng || null,
+          selectedItems: data.selectedItems || [],
+          createdAt: data.createdAt 
+            ? (typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt)) 
+            : (data.bookingDate ? new Date(`${data.bookingDate} ${data.bookingTime || ''}`) : new Date(0)),
+        } as any);
+      });
+      callback(leadsList);
+    }, (error) => {
+      console.error("Failed to subscribe to leads:", error);
+      callback([]);
+    });
+
+    return unsubscribe;
   },
 
   // Accept a lead
@@ -366,10 +426,10 @@ export const api = {
   },
 
   // Update lead progress steps in real-time
-  updateLeadProgress: async (leadId: string, workSteps: any[], status?: string): Promise<boolean> => {
+  updateLeadProgress: async (leadId: string, workSteps: WorkStep[], status?: string): Promise<boolean> => {
     const bookingRef = doc(db, "bookings", leadId);
     try {
-      const updateData: any = { workSteps };
+      const updateData: { workSteps: WorkStep[]; status?: string } = { workSteps };
       if (status) {
         updateData.status = status;
       }

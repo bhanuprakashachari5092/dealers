@@ -28,11 +28,11 @@ export function Card({ children, style, variant = 'default', onPress, ...props }
   };
 
   const CardContent = Platform.OS === 'ios' ? (
-    <BlurView intensity={60} tint="light" style={[styles.card, variant === 'elevated' && styles.elevated, style as any]}>
+    <BlurView intensity={60} tint="dark" style={[styles.card, variant === 'elevated' && styles.elevated, style as any]}>
       {children}
     </BlurView>
   ) : (
-    <View style={[styles.card, variant === 'elevated' && styles.elevated, { backgroundColor: 'rgba(255, 255, 255, 0.95)' }, style as any]}>
+    <View style={[styles.card, variant === 'elevated' && styles.elevated, { backgroundColor: 'rgba(25, 28, 36, 0.95)' }, style as any]}>
       {children}
     </View>
   );

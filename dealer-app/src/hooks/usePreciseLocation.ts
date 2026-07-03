@@ -58,9 +58,10 @@ export function usePreciseLocation(dealerId?: string) {
           handleLocationUpdate(locationData);
         }
       );
-    } catch (err: any) {
-      console.warn("Failed to get location:", err);
-      setError(err?.message || "Failed to resolve GPS coordinates.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to resolve GPS coordinates.";
+      console.warn("Failed to get location:", message);
+      setError(message);
     } finally {
       setIsLocating(false);
     }
