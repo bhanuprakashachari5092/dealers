@@ -9,7 +9,13 @@ import { Button } from '../../components/ui/Button';
 import { AnimatedBackground } from '../../components/ui/AnimatedBackground';
 import { MapPin, Wrench, Clock, Navigation, Compass, CheckCircle2 } from 'lucide-react-native';
 import Animated, { FadeInUp, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
-import { Audio } from 'expo-av';
+
+let Audio: any = null;
+try {
+  Audio = require('expo-av').Audio;
+} catch (e) {
+  console.log("expo-av native module not found, audio will be disabled");
+}
 
 // Pulsing location dot component
 const LocationPing = () => {
@@ -103,13 +109,14 @@ export default function NewLeadsScreen() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [acceptedLeadIds, setAcceptedLeadIds] = useState<string[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [sound, setSound] = useState<any>(null);
 
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const prevCount = useRef(0);
 
   const playRingingSound = async () => {
     try {
+      if (!Audio) return;
       if (sound) await sound.unloadAsync();
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
