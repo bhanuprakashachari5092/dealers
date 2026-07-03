@@ -262,15 +262,15 @@ export default function MyLeadsScreen() {
       const distance = getHaversineDistance(dealerLat, dealerLng, customerLat, customerLng);
       const distanceMeters = distance * 1000;
 
-      // Geofence check: 200 meters (0.2 km)
-      if (distanceMeters > 200) {
+      // Geofence check: 100 meters (0.1 km)
+      if (distanceMeters > 100) {
         const distanceStr = distance < 1 
           ? `${Math.round(distanceMeters)}m` 
           : `${distance.toFixed(2)} km`;
           
         Alert.alert(
           'Access Blocked',
-          `Work updates are restricted to the customer's location. You are currently ${distanceStr} away.\n\nPlease proceed to the customer site (within 200 meters) to update work progress.`
+          `Work updates are restricted to the customer's location. You are currently ${distanceStr} away.\n\nPlease proceed to the customer site (within 100 meters) to update work progress.`
         );
         setUpdatingStep(null);
         return;
