@@ -1,17 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { api, Notification } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/Colors';
 import { Card } from '../../components/ui/Card';
 import { AnimatedBackground } from '../../components/ui/AnimatedBackground';
-import { Bell, AlertTriangle, CheckCircle, BellRing } from 'lucide-react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import { Bell, AlertTriangle, CheckCircle, BellRing, Trash2 } from 'lucide-react-native';
+import Animated, { FadeInUp, Layout, SlideOutRight } from 'react-native-reanimated';
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearedIds, setClearedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user?.id) return;
@@ -22,6 +23,24 @@ export default function NotificationsScreen() {
     });
     return () => unsubscribe();
   }, [user?.id]);
+
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter(n => !clearedIds.has(n.id));
+  }, [notifications, clearedIds]);
+
+  const handleClearAll = () => {
+    const allIds = new Set(clearedIds);
+    notifications.forEach(n => allIds.add(n.id));
+    setClearedIds(allIds);
+  };
+
+  const handleClearSingle = (id: string) => {
+    setClearedIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
 
   const getIcon = (type: Notification['type']) => {
     switch (type) {
@@ -46,7 +65,11 @@ export default function NotificationsScreen() {
   };
 
   const renderItem = ({ item, index }: { item: Notification; index: number }) => (
-    <Animated.View entering={FadeInUp.delay(index * 100).duration(500)}>
+    <Animated.View 
+      entering={FadeInUp.delay(index * 100).duration(500)}
+      layout={Layout.springify()}
+      exiting={SlideOutRight}
+    >
       <Card style={styles.card} variant="elevated">
         <View style={styles.contentRow}>
           <View style={[styles.iconContainer, { backgroundColor: getIconBackground(item.type) }]}>
@@ -57,6 +80,9 @@ export default function NotificationsScreen() {
             <Text style={styles.message}>{item.message}</Text>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
+          <TouchableOpacity onPress={() => handleClearSingle(item.id)} style={styles.clearIcon}>
+            <Trash2 size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       </Card>
     </Animated.View>
@@ -65,8 +91,15 @@ export default function NotificationsScreen() {
   return (
     <AnimatedBackground>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <BellRing size={28} color={Colors.primary} />
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <BellRing size={28} color={Colors.primary} style={{ marginLeft: 12 }} />
+        </View>
+        {visibleNotifications.length > 0 && (
+          <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
+            <Text style={styles.clearAllText}>Clear All</Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       {loading ? (
@@ -75,7 +108,7 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={visibleNotifications}
           keyExtractor={item => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -104,11 +137,28 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
     color: Colors.text,
     letterSpacing: -0.5,
+  },
+  clearAllBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  clearAllText: {
+    color: Colors.error,
+    fontSize: 13,
+    fontWeight: '700',
   },
   center: {
     flex: 1,
@@ -137,6 +187,10 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
+  },
+  clearIcon: {
+    padding: 8,
+    marginLeft: 8,
   },
   title: {
     color: Colors.text,

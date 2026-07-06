@@ -1,5 +1,6 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { View, TextInput, Text, StyleSheet, TextInputProps, TouchableOpacity, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { Colors } from '@/constants/Colors';
 import { Eye, EyeOff } from 'lucide-react-native';
 
@@ -9,9 +10,41 @@ interface InputFieldProps extends TextInputProps {
   isPassword?: boolean;
 }
 
-// Using memo to prevent unnecessary re-renders that cause focus loss
 export const InputField = memo(({ label, error, isPassword, style, value, onChangeText, placeholder, ...props }: InputFieldProps) => {
-  const [showPassword, setShowPassword] = React.useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Animations
+  const focusBorderColor = useSharedValue(Colors.border);
+  const glowOpacity = useSharedValue(0);
+  const translateX = useSharedValue(0);
+
+  useEffect(() => {
+    if (error) {
+      // Shake animation (150ms, 2 cycles = 4 movements)
+      translateX.value = withSequence(
+        withTiming(-5, { duration: 37 }),
+        withTiming(5, { duration: 75 }),
+        withTiming(-5, { duration: 75 }),
+        withTiming(5, { duration: 75 }),
+        withTiming(0, { duration: 37 })
+      );
+      focusBorderColor.value = withTiming(Colors.error);
+      glowOpacity.value = withTiming(0);
+    } else {
+      focusBorderColor.value = withTiming(isFocused ? Colors.primary : Colors.border);
+      glowOpacity.value = withTiming(isFocused ? 1 : 0);
+    }
+  }, [error, isFocused]);
+
+  const animatedContainerStyle = useAnimatedStyle(() => ({
+    borderColor: focusBorderColor.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const animatedGlowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
 
   return (
     <View style={styles.container}>
@@ -21,10 +54,10 @@ export const InputField = memo(({ label, error, isPassword, style, value, onChan
         </Text>
       )}
       
-      <View style={[
-        styles.inputContainer,
-        error ? styles.inputError : null,
-      ]}>
+      <Animated.View style={[styles.inputContainer, animatedContainerStyle]}>
+        {/* Glow behind border */}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.glowEffect, animatedGlowStyle]} pointerEvents="none" />
+        
         <TextInput
           style={[styles.input, style]}
           placeholder={placeholder}
@@ -33,12 +66,21 @@ export const InputField = memo(({ label, error, isPassword, style, value, onChan
           value={value}
           onChangeText={onChangeText}
           underlineColorAndroid="transparent"
+          onFocus={(e) => {
+            setIsFocused(true);
+            props.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            props.onBlur?.(e);
+          }}
           {...props}
         />
         {isPassword && (
           <TouchableOpacity
             style={styles.eyeIcon}
             onPress={() => setShowPassword(!showPassword)}
+            activeOpacity={0.7}
           >
             {showPassword ? (
               <EyeOff size={20} color={Colors.textSecondary} />
@@ -47,7 +89,7 @@ export const InputField = memo(({ label, error, isPassword, style, value, onChan
             )}
           </TouchableOpacity>
         )}
-      </View>
+      </Animated.View>
       
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -59,29 +101,38 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: Colors.textSecondary,
     marginBottom: 8,
     marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(25, 28, 36, 0.8)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(212, 175, 55, 0.3)',
-    borderRadius: 16,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderRadius: 8,
     paddingHorizontal: 16,
-    height: 56,
+    height: 52,
+    overflow: 'visible',
   },
-  inputError: {
-    borderColor: Colors.error,
+  glowEffect: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   input: {
     flex: 1,
     color: Colors.text,
-    fontSize: 16,
+    fontSize: 15,
     height: '100%',
     ...(Platform.OS === 'web' && { outlineStyle: 'none' } as any),
   },

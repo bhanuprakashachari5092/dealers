@@ -10,12 +10,7 @@ import { AnimatedBackground } from '../../components/ui/AnimatedBackground';
 import { MapPin, Wrench, Clock, Navigation, Compass, CheckCircle2 } from 'lucide-react-native';
 import Animated, { FadeInUp, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 
-let Audio: any = null;
-try {
-  Audio = require('expo-av').Audio;
-} catch (e) {
-  console.log("expo-av native module not found, audio will be disabled");
-}
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 // Pulsing location dot component
 const LocationPing = () => {
@@ -102,54 +97,56 @@ const SuccessCheck = () => {
   );
 };
 
+const getTimeAgo = (date?: Date) => {
+  if (!date) return 'Just now';
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'Just now';
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes} min${diffInMinutes > 1 ? 's' : ''} ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+};
+
 export default function NewLeadsScreen() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [acceptedLeadIds, setAcceptedLeadIds] = useState<string[]>([]);
+  const [rejectedLeadIds, setRejectedLeadIds] = useState<string[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [sound, setSound] = useState<any>(null);
+
+  const player = useAudioPlayer('https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=classic-phone-ringing-120536.mp3');
 
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const prevCount = useRef(0);
+  const isInitialLoad = useRef(true);
 
   const playRingingSound = async () => {
     try {
-      if (!Audio) return;
-      if (sound) await sound.unloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=classic-phone-ringing-120536.mp3' },
-        { shouldPlay: true, isLooping: true }
-      );
-      setSound(newSound);
+      if (player) {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          interruptionMode: 'mixWithOthers'
+        });
+        player.loop = true;
+        player.play();
+      }
     } catch (e) {
       console.log('Error playing sound:', e);
     }
   };
 
-  const stopRingingSound = async () => {
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
+  const stopRingingSound = () => {
+    if (player) {
+      player.pause();
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' && Constants.appOwnership !== 'expo') {
@@ -183,6 +180,9 @@ export default function NewLeadsScreen() {
               channelId,
               asForegroundService: true,
               color: '#D4AF37', // Gold color
+              pressAction: {
+                id: 'default',
+              },
             },
           });
         } else {
@@ -199,10 +199,13 @@ export default function NewLeadsScreen() {
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
+    isInitialLoad.current = true; // reset on resubscription
+    
     const unsubscribe = api.subscribeToLeads('new', user.id, (data) => {
-      const sortedLeads = data.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      const sortedData = data.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      const filteredLeads = sortedData.filter(l => !rejectedLeadIds.includes(l.id));
       
-      if (alertsEnabled && sortedLeads.length > prevCount.current && prevCount.current !== 0) {
+      if (!isInitialLoad.current && alertsEnabled && filteredLeads.length > prevCount.current) {
         if (Platform.OS !== 'web' && Constants.appOwnership !== 'expo') {
           try {
             const Notifications = require('expo-notifications');
@@ -214,23 +217,29 @@ export default function NewLeadsScreen() {
               },
               trigger: null,
             }).catch(() => {});
-          } catch (e) {
-            // Notifications module not available
-          }
+          } catch (e) {}
         }
-        // Play continuous ringing sound
         playRingingSound();
-      } else if (sortedLeads.length === 0) {
-        // Stop ringing if no leads left
+      } else if (filteredLeads.length < prevCount.current || filteredLeads.length === 0) {
         stopRingingSound();
       }
-      prevCount.current = sortedLeads.length;
       
-      setLeads(sortedLeads);
+      prevCount.current = filteredLeads.length;
+      isInitialLoad.current = false;
+      setLeads(filteredLeads);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user?.id, alertsEnabled]);
+  }, [user?.id, alertsEnabled, rejectedLeadIds]);
+
+  const handleReject = async (id: string) => {
+    stopRingingSound();
+    setRejectedLeadIds(prev => [...prev, id]);
+    setLeads(prev => prev.filter(l => l.id !== id));
+    if (user?.id) {
+      await api.rejectLead(id, user.id);
+    }
+  };
 
   const handleAccept = async (id: string) => {
     if (!user?.id) {
@@ -281,7 +290,7 @@ export default function NewLeadsScreen() {
               </View>
             </View>
             <View style={styles.timeBadge}>
-              <Text style={styles.timeBadgeText}>Just now</Text>
+              <Text style={styles.timeBadgeText}>{getTimeAgo(item.createdAt)}</Text>
             </View>
           </View>
 
@@ -307,13 +316,22 @@ export default function NewLeadsScreen() {
             </View>
           </View>
 
-          <Button
-            title={isAccepted ? "Accepted" : "Accept Lead"}
-            onPress={() => handleAccept(item.id)}
-            loading={acceptingId === item.id && !isAccepted}
-            disabled={isAccepted}
-            style={[styles.acceptButton, isAccepted && { backgroundColor: Colors.success, borderColor: Colors.success }]}
-          />
+          <View style={styles.buttonRow}>
+            <Button
+              title="Reject"
+              variant="outline"
+              onPress={() => handleReject(item.id)}
+              style={styles.rejectButton}
+              disabled={isAccepted}
+            />
+            <Button
+              title={isAccepted ? "Accepted" : "Accept Lead"}
+              onPress={() => handleAccept(item.id)}
+              loading={acceptingId === item.id && !isAccepted}
+              disabled={isAccepted}
+              style={[styles.acceptButton, isAccepted && { backgroundColor: Colors.success, borderColor: Colors.success }]}
+            />
+          </View>
         </Card>
       </Animated.View>
     );
@@ -492,8 +510,16 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontWeight: '700',
   },
-  acceptButton: {
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 4,
+  },
+  rejectButton: {
+    flex: 1,
+  },
+  acceptButton: {
+    flex: 2,
   },
   pingContainer: {
     width: 12,

@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, getDocs, runTransaction, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, getDocs, runTransaction, deleteDoc, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 
 export type WorkStep = {
   id: string;
@@ -150,7 +150,8 @@ export const api = {
       const leadsList: Lead[] = [];
       snap.forEach((docSnapshot) => {
         const data = docSnapshot.data();
-        if (status === 'new' && data.dealerId !== null && data.dealerId !== undefined) {
+        // For new status, only show if dealerId is not set
+        if (status === 'new' && data.dealerId && data.dealerId !== "") {
           return;
         }
         leadsList.push({
@@ -267,6 +268,20 @@ export const api = {
     }
   },
 
+  // Reject a lead
+  rejectLead: async (leadId: string, dealerId: string): Promise<boolean> => {
+    try {
+      const bookingRef = doc(db, "bookings", leadId);
+      await updateDoc(bookingRef, {
+        rejectedBy: arrayUnion(dealerId)
+      });
+      return true;
+    } catch (e) {
+      console.error("Failed to reject lead in Firestore:", e);
+      return false;
+    }
+  },
+
   // Get notifications once (Promise-based fallback)
   getNotifications: async (): Promise<Notification[]> => {
     return mockNotifications;
@@ -283,12 +298,13 @@ export const api = {
         callback([]);
         return () => {};
       }
-      const q = query(collection(db, "bookings"), where("eligibleDealers", "array-contains", dealerId));
+      const q = query(collection(db, "bookings"), where("eligibleDealers", "array-contains", dealerId.trim()));
       return onSnapshot(q, (snapshot) => {
         const leadsList: Lead[] = [];
         snapshot.forEach((docSnapshot) => {
           const data = docSnapshot.data();
-          if (data.dealerId === null || data.dealerId === undefined) {
+          // Show only if not yet accepted (dealerId is missing, null, or empty string)
+          if (!data.dealerId || data.dealerId === null || data.dealerId === "") {
             leadsList.push({
               id: docSnapshot.id,
               customerName: data.customerName || 'Anonymous',

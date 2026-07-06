@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, ActivityIndicator, PressableProps, View, Pressable } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator, PressableProps, View, Pressable, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Gradients } from '@/constants/Colors';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -25,7 +25,7 @@ export function Button({ title, loading, variant = 'primary', style, disabled, o
 
   const handlePressIn = () => {
     if (!disabled && !loading) {
-      scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
+      scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
     }
   };
 
@@ -39,7 +39,6 @@ export function Button({ title, loading, variant = 'primary', style, disabled, o
     <View style={[
       styles.buttonContent,
       isOutline && styles.outlineContent,
-      isDanger && styles.dangerContent,
     ]}>
       {loading ? (
         <ActivityIndicator color={isOutline ? Colors.primary : Colors.white} />
@@ -62,17 +61,18 @@ export function Button({ title, loading, variant = 'primary', style, disabled, o
       disabled={disabled || loading}
       style={[
         styles.container,
+        isDanger && styles.containerDanger,
         disabled && styles.disabled,
         animatedStyle,
         style as any,
       ]}
       {...props}
     >
-      {isPrimary ? (
+      {(isPrimary || isDanger) ? (
         <LinearGradient
-          colors={Gradients.primary}
+          colors={isDanger ? Gradients.error : Gradients.primary}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.gradient}
         >
           {content}
@@ -87,40 +87,40 @@ export function Button({ title, loading, variant = 'primary', style, disabled, o
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: 'hidden',
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
     elevation: 6,
+    backgroundColor: Colors.panel,
+  },
+  containerDanger: {
+    shadowColor: Colors.error,
   },
   gradient: {
     width: '100%',
   },
   buttonContent: {
-    paddingVertical: 18,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineContent: {
     backgroundColor: 'transparent',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: Colors.primary,
-    borderRadius: 16,
-  },
-  dangerContent: {
-    backgroundColor: Colors.error,
-    borderRadius: 16,
+    borderRadius: 8,
   },
   disabled: {
-    opacity: 0.6,
+    opacity: 0.5,
     shadowOpacity: 0,
     elevation: 0,
   },
   text: {
     color: Colors.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.5,
   },

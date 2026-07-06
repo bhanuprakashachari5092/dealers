@@ -44,7 +44,16 @@
             "imageWidth": 240
           }
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "ndkVersion": "26.1.10909125"
+          }
+        }
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

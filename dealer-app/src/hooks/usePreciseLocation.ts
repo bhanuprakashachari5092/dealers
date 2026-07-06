@@ -38,10 +38,22 @@ export function usePreciseLocation(dealerId?: string) {
       }
 
       // Check current position first (quick initial check)
-      const currentLoc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation,
-      });
-      handleLocationUpdate(currentLoc);
+      try {
+        const currentLoc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+        });
+        handleLocationUpdate(currentLoc);
+      } catch (initialErr) {
+        console.warn("Initial location fetch failed, relying on watchPositionAsync...", initialErr);
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            handleLocationUpdate(lastKnown);
+          }
+        } catch (fallbackErr) {
+          // Ignore fallback errors
+        }
+      }
 
       // Watch position continuously
       if (subscriptionRef.current) {

@@ -1,54 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db } from '../config/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
+import { doc, getDoc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { usePreciseLocation } from '../hooks/usePreciseLocation';
 
-// EXTREMELY SAFE Notification handling for Expo Go SDK 53+
+// Dynamically import Notifications to prevent crash in Expo Go SDK 53+
 let Notifications: any = null;
-if (Constants.appOwnership !== 'expo' && Platform.OS !== 'web') {
-  try {
-    Notifications = require('expo-notifications');
-    if (Notifications) {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: false,
-          shouldShowBanner: true,
-          shouldShowList: true,
-        }),
-      });
-    }
-  } catch (e) {
-    // Silent fail
-  }
-}
-
-async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (!Notifications || Constants.appOwnership === 'expo' || Platform.OS === 'web' || !Device.isDevice) {
-    return null;
-  }
-  
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') return null;
-
-    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    return token;
-  } catch (e) {
-    return null;
-  }
-}
+try {
+  Notifications = require('expo-notifications');
+} catch (e) {}
 
 type User = {
   id: string;
@@ -71,20 +35,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const notifiedLeads = useRef<Set<string>>(new Set());
+
+  // Setup Notification Channel (Professional Level)
+  useEffect(() => {
+    if (Platform.OS === 'android' && Notifications) {
+      Notifications.setNotificationChannelAsync('new-leads-pro', {
+        name: 'New Lead Alerts',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        enableVibrate: true,
+        enableLights: true,
+        showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        sound: 'default', // You can use a custom sound file here later
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const checkLogin = async () => {
       try {
         const storedUser = await AsyncStorage.getItem('user');
         const token = await AsyncStorage.getItem('auth_token');
-        
         if (storedUser && token) {
           setUser(JSON.parse(storedUser));
-        } else {
-          setUser(null);
         }
       } catch (e) {
-        // Silent recovery - remove console.warn to hide yellow box
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -93,17 +71,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkLogin();
   }, []);
 
+  // Professional Lead Monitor - Background Listener
   useEffect(() => {
-    if (user?.id) {
-      registerForPushNotificationsAsync().then(async (token) => {
-        if (token) {
-          try {
-            const dealerRef = doc(db, 'dealers', user.id);
-            await updateDoc(dealerRef, { pushToken: token });
-          } catch (err) {}
+    if (!user?.id) return;
+
+    // Listen for leads assigned to this dealer that are still "New"
+    const q = query(
+      collection(db, "bookings"),
+      where("eligibleDealers", "array-contains", user.id.trim())
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        const data = change.doc.data();
+        const leadId = change.doc.id;
+
+        // Trigger only for NEW leads that haven't been notified yet and are not accepted
+        if (
+          (change.type === "added" || change.type === "modified") &&
+          (!data.dealerId || data.dealerId === "") &&
+          !notifiedLeads.current.has(leadId)
+        ) {
+
+          // Professional Local Notification Trigger
+          if (Notifications && Platform.OS !== 'web') {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: "🚨 New Lead Received!",
+                body: `Customer ${data.customerName || 'Nearby'} needs ${data.serviceName || 'Service'} in ${data.customerAddress || 'your area'}.`,
+                data: { leadId, screen: 'new-leads' },
+                sound: true,
+                priority: 'max',
+              },
+              trigger: null, // Immediate
+            });
+
+            notifiedLeads.current.add(leadId);
+          }
+        } else if (data.dealerId && data.dealerId !== "") {
+          // If lead is accepted, remove from notified set to keep memory clean
+          notifiedLeads.current.delete(leadId);
         }
       });
-    }
+    });
+
+    return () => unsubscribe();
   }, [user?.id]);
 
   usePreciseLocation(user?.id || undefined);
@@ -135,14 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(userData);
-
-      try {
-        await AsyncStorage.setItem('auth_token', 'firebase_auth_token_active');
-        if (rememberMe) {
-          await AsyncStorage.setItem('user', JSON.stringify(userData));
-        }
-      } catch (storageErr) {
-        // Silent recovery
+      await AsyncStorage.setItem('auth_token', 'firebase_auth_token_active');
+      if (rememberMe) {
+        await AsyncStorage.setItem('user', JSON.stringify(userData));
       }
     } catch (error: any) {
       throw error;

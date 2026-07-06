@@ -1,27 +1,32 @@
 export const Colors = {
-  background: '#0B0E14',      // Midnight Black / Deep Charcoal
-  card: 'rgba(25, 28, 36, 0.85)', // Dark frosted glass
-  cardBorder: 'rgba(212, 175, 55, 0.3)', // Subtle Gold border
-  text: '#FFFFFF',            // Pristine White
-  textSecondary: '#A0AEC0',   // Muted Silver/Gray
-  primary: '#D4AF37',         // Metallic Gold
-  gradientStart: '#D4AF37',   // Gold
-  gradientEnd: '#F3E5AB',     // Champagne
+  background: '#0B0E14',      // bg-base-bg
+  card: '#181C24',            // bg-base-card
+  cardHover: '#1E232D',       // bg-base-card-hover
+  panel: '#11141A',           // bg-base-panel
+  border: '#262B36',          // border-base-border
+  cardBorder: 'rgba(245, 158, 11, 0.3)', // Subtle signal border
+  text: '#FFFFFF',            // text-primary
+  textSecondary: '#9CA3AF',   // text-secondary
+  muted: '#6B7280',           // text-muted
+  primary: '#F59E0B',         // signal-500
+  gradientStart: '#F59E0B',   // signal-500
+  gradientEnd: '#D97706',     // signal-600
   cyan: '#06B6D4',            
-  success: '#10B981',         
-  error: '#EF4444',           
-  warning: '#F59E0B',         
+  success: '#10B981',         // status-accepted
+  error: '#EF4444',           // status-rejected
+  warning: '#F59E0B',         // signal-500
+  info: '#3B82F6',            // status-info
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
 };
 
 export const Gradients = {
-  primary: [Colors.gradientStart, Colors.gradientEnd] as const,
-  success: ['#34D399', '#10B981'] as const,
-  warning: ['#FBBF24', '#F59E0B'] as const,
-  error: ['#F87171', '#EF4444'] as const,
-  lightLuxury: ['#1A202C', '#2D3748'] as const, // Dark luxury background
-  cardLuxury: ['rgba(30, 34, 45, 0.95)', 'rgba(20, 24, 33, 0.7)'] as const, 
-  glow: ['rgba(212, 175, 55, 0.4)', 'rgba(243, 229, 171, 0.1)'] as const, // Gold glow
+  primary: [Colors.gradientStart, Colors.gradientEnd] as const, // signal-gradient
+  success: ['#34D399', Colors.success] as const,
+  warning: ['#FBBF24', Colors.warning] as const,
+  error: ['#F87171', Colors.error] as const, // danger-gradient
+  lightLuxury: [Colors.panel, Colors.background] as const, // bg-app-radial equivalent
+  cardLuxury: [Colors.cardHover, Colors.card] as const, 
+  glow: ['rgba(245, 158, 11, 0.4)', 'rgba(245, 158, 11, 0.05)'] as const, // shadow-glow-signal
 };

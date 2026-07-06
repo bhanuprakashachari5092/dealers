@@ -109,65 +109,7 @@ export default function MyLeadsScreen() {
     });
   };
 
-  const checkVpnAndProxy = async (): Promise<{ isVpn: boolean; reason: string; details?: any }> => {
-    try {
-      const response = await fetch('https://ipapi.co/json/');
-      if (!response.ok) {
-        const backupResponse = await fetch('https://ipinfo.io/json');
-        if (backupResponse.ok) {
-          const backupData = await backupResponse.json();
-          const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const ipTimezone = backupData.timezone;
-          
-          if (deviceTimezone !== ipTimezone) {
-            return {
-              isVpn: true,
-              reason: `Timezone mismatch: Device has ${deviceTimezone}, but IP has ${ipTimezone}`,
-              details: backupData
-            };
-          }
-          
-          const orgLower = (backupData.org || '').toLowerCase();
-          const hostingKeywords = ['amazon', 'aws', 'google cloud', 'digitalocean', 'linode', 'vpn', 'proxy', 'hosting', 'm247', 'ovh', 'leaseweb', 'hetzner'];
-          if (hostingKeywords.some(kw => orgLower.includes(kw))) {
-            return {
-              isVpn: true,
-              reason: `VPN/Hosting network detected: ${backupData.org}`,
-              details: backupData
-            };
-          }
-        }
-        return { isVpn: false, reason: '' };
-      }
-      
-      const data = await response.json();
-      const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const ipTimezone = data.timezone;
-      
-      if (deviceTimezone !== ipTimezone) {
-        return {
-          isVpn: true,
-          reason: `Timezone mismatch: Device has ${deviceTimezone}, but IP has ${ipTimezone}`,
-          details: data
-        };
-      }
-      
-      const orgLower = (data.org || '').toLowerCase();
-      const hostingKeywords = ['amazon', 'aws', 'google cloud', 'digitalocean', 'linode', 'vpn', 'proxy', 'hosting', 'm247', 'ovh', 'leaseweb', 'hetzner'];
-      if (hostingKeywords.some(kw => orgLower.includes(kw))) {
-        return {
-          isVpn: true,
-          reason: `VPN/Hosting network detected: ${data.org}`,
-          details: data
-        };
-      }
-      
-      return { isVpn: false, reason: '' };
-    } catch (error) {
-      console.warn("VPN check failed:", error);
-      return { isVpn: false, reason: 'Failed to complete API check' };
-    }
-  };
+
 
   const handleToggleStep = async (lead: Lead, stepId: string) => {
     if (updatingStep) return;
@@ -209,25 +151,7 @@ export default function MyLeadsScreen() {
         return;
       }
 
-      // 2.2 Check for VPN / Proxy connection
-      const vpnCheck = await checkVpnAndProxy();
-      if (vpnCheck.isVpn) {
-        Alert.alert(
-          'Security Violation',
-          'VPN or Proxy connection detected. Please disable your VPN to update work progress.\n\nThis incident has been logged and reported to the administrator.'
-        );
-        if (user?.id) {
-          await api.logSecurityAlert(
-            user.id,
-            user.name || 'Unknown Dealer',
-            'VPN / Proxy Usage Detected',
-            { reason: vpnCheck.reason, details: vpnCheck.details },
-            lead.id
-          );
-        }
-        setUpdatingStep(null);
-        return;
-      }
+
 
       const dealerLat = location.coords.latitude;
       const dealerLng = location.coords.longitude;
